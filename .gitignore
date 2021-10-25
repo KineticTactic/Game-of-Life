@@ -1,0 +1,5 @@
+obj/
+bin/GameOfLIfe*.*
+.vs/
+Tools/
+*.vcxproj.user
