@@ -21,34 +21,35 @@ void ofApp::initComputeShader() {
 //--------------------------------------------------------------
 void ofApp::initTextures() {
 	// Initialize starting frame 
-	startFrame.allocate(SIM_WIDTH, SIM_HEIGHT, OF_IMAGE_GRAYSCALE);
+	startFrame.allocate(SIM_SIZE, SIM_SIZE, OF_IMAGE_GRAYSCALE);
 	startFrame.getTexture().setTextureMinMagFilter(GL_LINEAR, GL_NEAREST);
 
-	for (int y = 0; y < SIM_HEIGHT; y++) {
-		for (int x = 0; x < SIM_WIDTH; x++) {
+	for (int y = 0; y < SIM_SIZE; y++) {
+		for (int x = 0; x < SIM_SIZE; x++) {
 			startFrame.setColor(x, y, ofRandom(100) < 15 ? ofColor(255, 255, 255) : ofColor(0, 0, 0));
 		}
 	}
 	startFrame.update();
 
 	// Initialize simulation frame 
-	frame.allocate(SIM_WIDTH, SIM_HEIGHT, GL_R8);
+	frame.allocate(SIM_SIZE, SIM_SIZE, GL_R8);
 	frame.setTextureMinMagFilter(GL_LINEAR, GL_NEAREST);
 
 	// Initialize simulation buffer frame
-	bufferFrame.allocate(SIM_WIDTH, SIM_HEIGHT, GL_R8);
+	bufferFrame.allocate(SIM_SIZE, SIM_SIZE, GL_R8);
 	bufferFrame.setTextureMinMagFilter(GL_LINEAR, GL_NEAREST);
 
 	// copy over data from starting frame to simulation frame 
 	ofPixels pix;
 	startFrame.getTexture().readToPixels(pix);
 	frame.loadData(pix);
+	bufferFrame.loadData(pix);
 }
 
 //--------------------------------------------------------------
 void ofApp::initCamera() {
-	cam.setVFlip(true);
-	cam.setPosition({ 0.f, 0.f, -100.f });
+	cam.setVFlip(true); 
+	cam.setPosition({ 1.f, 0.f, -100.f });
 	cam.enableOrtho();
 	cam.setNearClip(-1000000);
 	cam.setFarClip(1000000);

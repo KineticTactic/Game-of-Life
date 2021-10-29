@@ -23,14 +23,20 @@ ImTextureID loadImageForImGui(const char* filename) {
 	return (ImTextureID)tex->getTextureData().textureID;
 }
 
+ofVec2f screenSpaceToWorldSpace(ofVec2f pos, ofCamera& cam) {
+	float worldX = ((float)pos.x - ofGetWidth() / 2 + cam.getPosition().x / cam.getScale().x) * cam.getScale().x;
+	float worldY = ((float)pos.y - ofGetHeight() / 2 + cam.getPosition().y / cam.getScale().y) * cam.getScale().y;
+	return { worldX, worldY };
+}
+
 
 //--------------------------------------------------------------
 void ofApp::setup() {
 	ofSetLogLevel(OF_LOG_VERBOSE);
 	ofSetFrameRate(60);
 
-	SIM_WIDTH = 128;
-	SIM_HEIGHT = 128;
+	SIM_SIZE = 128;
+	MAP_SIZE = 1600.f;
 
 	initComputeShader();
 	initRenderFBO();
@@ -41,27 +47,66 @@ void ofApp::setup() {
 
 	playIcon = loadImageForImGui("images/play.png");
 	pauseIcon = loadImageForImGui("images/pause.png");
+
+	plane.set(100, 100);
 }
 
 //--------------------------------------------------------------
 void ofApp::update() {
-	if (!simulationRunning) return;
-	if (ofGetFrameNum() % (101 - simulationSpeed) != 0) return;
+	if (isBeingDrawn) {
+		int x = ofGetMouseX();
+		int y = ofGetMouseY();
 
-	frame.bindAsImage(0, GL_READ_ONLY);
-	bufferFrame.bindAsImage(1, GL_WRITE_ONLY);
+		ofVec2f worldSpaceCoords = screenSpaceToWorldSpace({ (float)x, (float)y }, cam);
+		ofVec2f mapCoords = worldSpaceCoords / 1600.f * SIM_SIZE;
 
-	compute.begin();
-	compute.setUniform2i("simSize", SIM_WIDTH, SIM_HEIGHT);
-	compute.dispatchCompute(SIM_WIDTH / 32, SIM_HEIGHT / 32, 1);
-	compute.end();
+		if (brushSize == 1) {
+			addBuffer.push_back(vec2i{ (int)floor(mapCoords.x) , (int)floor(mapCoords.y) });
+		}
+		else {
+			for (int offX = -brushSize / 2; offX < brushSize / 2; offX++) {
+				for (int offY = -brushSize / 2; offY < brushSize / 2; offY++) {
+					if (roundBrush) {
+						float distSq = offX * offX + offY * offY;
+						if (distSq > brushSize * brushSize / 4)
+							continue;
+					}
+					addBuffer.push_back(vec2i{ (int) mapCoords.x + offX , (int)mapCoords.y + offY });
+				}
+			}
+		}
+	}
 
+	bool updated = false;
 	ofPixels pix;
-	bufferFrame.readToPixels(pix);
-	frame.loadData(pix);
 
-	
-	//std::cout << ofGetFrameRate() << std::endl;
+	if (simulationRunning && (ofGetFrameNum() % (101 - simulationSpeed) == 0)) {
+		frame.bindAsImage(0, GL_READ_ONLY);
+		bufferFrame.bindAsImage(1, GL_WRITE_ONLY);
+
+		compute.begin();
+		compute.setUniform2i("simSize", SIM_SIZE, SIM_SIZE);
+		compute.dispatchCompute(SIM_SIZE / 32, SIM_SIZE / 32, 1);
+		compute.end();
+
+
+		bufferFrame.readToPixels(pix);	
+		//frame.loadData(pix);
+		updated = true;
+	}
+	else if(addBuffer.size() > 0) {
+		frame.readToPixels(pix);
+		updated = true;
+	}
+
+	if (updated) {
+		for (vec2i& a : addBuffer) {
+			pix.setColor(a.x, a.y, { 255.f });
+		}
+		addBuffer.clear();
+		frame.loadData(pix);
+	}
+
 }
 
 //--------------------------------------------------------------
@@ -72,7 +117,6 @@ void ofApp::draw() {
 	cam.begin();
 
 	frame.draw(glm::vec3(0.f), 1600, 1600);
-	//startFrame.draw(glm::vec3(800.f, 0.f, 0.f), 800, 800);
 
 	cam.end();
 
@@ -100,6 +144,8 @@ void ofApp::renderGui() {
 	}
 
 	ImGui::SliderInt("Speed", &simulationSpeed, 1, 100);
+	ImGui::SliderInt("Brush Size", &brushSize, 1, 20);
+	ImGui::Checkbox("Round Brush", &roundBrush);
 	ImGui::End();
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f });
@@ -116,7 +162,7 @@ void ofApp::renderGui() {
 
 //--------------------------------------------------------------
 void ofApp::mouseDragged(int x, int y, int button) {
-	if (isRenderWindowHovered) {
+	if (isRenderWindowHovered && button == OF_MOUSE_BUTTON_MIDDLE) {
 		cam.move(ofVec3f{ (prevMousePos.x - x) * cam.getScale().x, (prevMousePos.y - y) * cam.getScale().y, 0.f });
 	}
 	prevMousePos = { (float)x, (float)y };
@@ -125,6 +171,14 @@ void ofApp::mouseDragged(int x, int y, int button) {
 //--------------------------------------------------------------
 void ofApp::mousePressed(int x, int y, int button) {
 	prevMousePos = { (float)x, (float)y };
+
+	if (isRenderWindowHovered && button == OF_MOUSE_BUTTON_LEFT) {
+		isBeingDrawn = true;
+	}
+}
+
+void ofApp::mouseReleased(int x, int y, int button) {
+	isBeingDrawn = false;
 }
 
 //--------------------------------------------------------------
@@ -176,6 +230,10 @@ void ofApp::beginImGuiDockSpace() {
 	}
 
 	ImGui::End();
+}
+
+void ofApp::addCellAt(int x, int y)
+{
 }
 
 

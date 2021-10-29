@@ -45,6 +45,8 @@ void main() {
 
 	if (sum < 2) {
 		setCell(x, y, 0);
+	} else if (sum == 2 && getCell(x, y) == 1) {
+		setCell(x, y, 1);
 	} else if (sum == 3) {
 		setCell(x, y, 1);
 	} else if (sum > 3) {
